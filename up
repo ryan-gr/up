@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+
+confpath="$PWD/.up/config"
+shapath="$PWD/.up/sha"
+filespath="$PWD/.up/files"
+temppath="$PWD/.up/temp"
+
+if [ "$1" == "init" ]; then
+  
+  if [ -f $confpath ]; then
+    echo -n "Config file already exists. Override? (y/n) "
+    read 
+    if [ "$REPLY" != "y" ]; then exit 0; fi
+  fi
+    
+  echo Creating new config file.
+  mkdir -p $(dirname $confpath)
+  echo -n "base (a host or alias): " 
+  read
+  echo base=$REPLY > $confpath
+  echo -n "destination (e.g. ~/dir): " 
+  read
+  echo dest=$REPLY >> $confpath
+  exit 0
+
+fi
+
+if [ "$1" == "reset" ]; then
+  
+  if [ -d "$PWD/.up" ]; then rm -rf "$PWD/.up"; fi
+  exit 0
+
+fi
+
+if [ -f $confpath ]; then
+
+  . $confpath
+
+  file_list=()
+  while IFS= read -d $'\0' -r file ; do
+    if [ "$file" == "." ]; then continue; fi
+    if [ "$file" == "./.up/config" ]; then continue; fi
+    if [ "$file" == "./.up/sha" ]; then continue; fi
+    if [ "$file" == "./.up/files" ]; then continue; fi
+    if [ -d "$file" ]; then continue; fi
+    file_list=("${file_list[@]}" "$file")
+  done < <(find . -print0)
+  # based on https://stackoverflow.com/questions/8213328/
+  # store-the-output-of-find-command-in-an-array/8213509
+
+  if [ -f $shapath ]; then
+    . $shapath
+    rm $shapath
+  fi 
+
+  todelete=""
+
+  if [ -f $filespath ]; then
+    
+    while IFS= read -r line; do
+      found=0
+      for item in ${file_list[@]}; do
+        if [ "$line" == "$item" ]; then found=1; fi
+      done
+      if [ $found -eq 0 ]; then 
+        f=$dest"${line//\.\///}" 
+        todelete+="$f "
+      fi
+    done < "$filespath" 
+    
+    rm $filespath
+  fi 
+
+  changed=()
+   
+  for item in ${file_list[@]}; do
+    if [ -d "$file" ]; then continue; fi
+    namesha=_$(echo $item | shasum | awk '{ print $1 }')
+    valsha=$(shasum $item | awk '{ print $1 }')
+
+    if [ "${!namesha}" != "$valsha" ]; then
+      changed+=($item)
+    fi
+
+    echo "$namesha=$valsha" >> $shapath
+    echo "$item" >> $filespath
+
+  done 
+
+  str=""
+  lastdir=$(dirname "${changed[0]}")
+
+  for c in "${changed[@]}"; do
+    tempc="${c/\.\//$temppath/}"
+    echo temping to $tempc
+    mkdir -p $(dirname $tempc)
+    cp $c $tempc
+    str+="$c "
+  done
+ 
+  if [ "$str" != "" ]; then
+    echo Uploading $str to $base:$dest.
+    scp -r $temppath/* $base:$dest
+    rm -rf $temppath
+  else
+    echo Nothing to upload.
+  fi
+
+  if [ "$todelete" != "" ]; then
+    echo Deleting $todelete
+    ssh $base "rm -f $todelete"
+  else
+    echo Nothing to delete.
+  fi
+
+else
+  echo Config file missing.
+fi
