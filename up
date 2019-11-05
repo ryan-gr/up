@@ -5,6 +5,8 @@ shapath="$PWD/.up/sha"
 filespath="$PWD/.up/files"
 temppath="$PWD/.up/temp"
 
+forced=0
+
 if [ "$1" == "init" ]; then
   
   if [ -f $confpath ]; then
@@ -18,7 +20,7 @@ if [ "$1" == "init" ]; then
   echo -n "base (a host or alias): " 
   read
   echo base=$REPLY > $confpath
-  echo -n "destination (e.g. ~/dir): " 
+  echo -n "destination (e.g. \"~/dir\"): " 
   read
   echo dest=$REPLY >> $confpath
   exit 0
@@ -30,6 +32,10 @@ if [ "$1" == "reset" ]; then
   if [ -d "$PWD/.up" ]; then rm -rf "$PWD/.up"; fi
   exit 0
 
+fi
+
+if [ "$1" == "force" ]; then
+  forced=1
 fi
 
 if [ -f $confpath ]; then
@@ -80,6 +86,10 @@ if [ -f $confpath ]; then
 
     if [ "${!namesha}" != "$valsha" ]; then
       changed+=($item)
+    else
+      if [ "$forced" == "1" ]; then
+        changed+=($item)
+      fi
     fi
 
     echo "$namesha=$valsha" >> $shapath
@@ -92,7 +102,7 @@ if [ -f $confpath ]; then
 
   for c in "${changed[@]}"; do
     tempc="${c/\.\//$temppath/}"
-    echo temping to $tempc
+    echo Temping to $tempc
     mkdir -p $(dirname $tempc)
     cp $c $tempc
     str+="$c "
