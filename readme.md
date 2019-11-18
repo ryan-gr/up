@@ -13,6 +13,7 @@ You will be prompted to enter a base (either an alias or a hostname), and a dest
 Subsequently, use the `up` command to 'push' changes to the working directory to the remote destination. The command will handle addition of new files, modification of existing files, and deletion of files.
 
 Use `up reset` to remove all traces of the utility on a working directory.
+Use `up force` to force all files in the directory to be re-uploaded.
 
 ### Remarks
 
